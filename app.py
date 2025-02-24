@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from datetime import datetime, timedelta
 import numpy as np
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -11,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS
+# Custom CSS (simplified)
 st.markdown("""
 <style>
     .metric-card {
@@ -19,18 +18,6 @@ st.markdown("""
         padding: 20px;
         border-radius: 10px;
         margin: 10px 0;
-    }
-    .local-tag {
-        color: #2E7D32;
-        background-color: #C8E6C9;
-        padding: 5px 10px;
-        border-radius: 15px;
-    }
-    .regional-tag {
-        color: #1976D2;
-        background-color: #BBDEFB;
-        padding: 5px 10px;
-        border-radius: 15px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -41,9 +28,7 @@ if 'producers' not in st.session_state:
         'name': ['Green Acres', 'Sunny Valley', 'River Farm', 'Highland Ranch'],
         'distance': [15, 25, 45, 30],
         'products': ['Vegetables', 'Dairy', 'Meat', 'Fruits'],
-        'certification': ['Organic', 'Conventional', 'Regenerative', 'Organic'],
-        'lat': [40.7128, 40.7589, 40.6892, 40.7281],
-        'lon': [-74.0060, -73.9851, -74.0445, -73.9467]
+        'certification': ['Organic', 'Conventional', 'Regenerative', 'Organic']
     })
 
 if 'products' not in st.session_state:
@@ -59,7 +44,7 @@ if 'products' not in st.session_state:
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
     "Select Page",
-    ["Dashboard", "Producers", "Products", "Market Analysis"]
+    ["Dashboard", "Producers", "Products"]
 )
 
 # Dashboard
@@ -93,19 +78,9 @@ if page == "Dashboard":
             delta="1 new this month"
         )
     
-    # Map of producers
-    st.subheader("Producer Network")
-    fig = px.scatter_mapbox(
-        st.session_state.producers,
-        lat='lat',
-        lon='lon',
-        hover_name='name',
-        hover_data=['products', 'certification'],
-        zoom=10,
-        title="Local Producer Network"
-    )
-    fig.update_layout(mapbox_style="open-street-map")
-    st.plotly_chart(fig)
+    # Simple visualization
+    st.subheader("Producer Distance Distribution")
+    st.bar_chart(st.session_state.producers.set_index('name')['distance'])
     
     # Seasonal products
     st.subheader("Currently In Season")
@@ -138,8 +113,6 @@ elif page == "Producers":
                     "Certification",
                     ["Organic", "Conventional", "Regenerative"]
                 )
-                lat = st.number_input("Latitude", value=40.7128)
-                lon = st.number_input("Longitude", value=-74.0060)
             
             submitted = st.form_submit_button("Add Producer")
             if submitted:
@@ -147,9 +120,7 @@ elif page == "Producers":
                     'name': [name],
                     'distance': [distance],
                     'products': [', '.join(products)],
-                    'certification': [certification],
-                    'lat': [lat],
-                    'lon': [lon]
+                    'certification': [certification]
                 })
                 st.session_state.producers = pd.concat([st.session_state.producers, new_producer], ignore_index=True)
                 st.success("Producer added successfully!")
@@ -158,29 +129,10 @@ elif page == "Producers":
     st.subheader("Producer List")
     st.dataframe(st.session_state.producers)
     
-    # Producer analytics
-    st.subheader("Producer Analytics")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Distance distribution
-        fig = px.histogram(
-            st.session_state.producers,
-            x='distance',
-            title="Distribution of Food Miles",
-            labels={'distance': 'Miles from City Center'}
-        )
-        st.plotly_chart(fig)
-    
-    with col2:
-        # Certification breakdown
-        cert_counts = st.session_state.producers['certification'].value_counts()
-        fig = px.pie(
-            values=cert_counts.values,
-            names=cert_counts.index,
-            title="Producer Certifications"
-        )
-        st.plotly_chart(fig)
+    # Simple analytics
+    st.subheader("Certification Distribution")
+    cert_counts = st.session_state.producers['certification'].value_counts()
+    st.bar_chart(cert_counts)
 
 # Products page
 elif page == "Products":
@@ -229,74 +181,6 @@ elif page == "Products":
             st.session_state.products['season'].str.contains('Year-round')
         ]
         st.dataframe(seasonal[['name', 'producer', 'price_per_unit', 'unit']])
-
-# Market Analysis
-else:
-    st.title("Market Analysis")
-    
-    # Price trends
-    st.subheader("Price Trends")
-    
-    # Generate sample price history
-    dates = pd.date_range(start='2024-01-01', end='2024-02-23', freq='W')
-    products = st.session_state.products['name'].unique()
-    
-    price_history = []
-    for product in products:
-        base_price = st.session_state.products[
-            st.session_state.products['name'] == product
-        ]['price_per_unit'].iloc[0]
-        
-        for date in dates:
-            # Add some random variation to prices
-            price = base_price * (1 + np.random.normal(0, 0.1))
-            price_history.append({
-                'date': date,
-                'product': product,
-                'price': price
-            })
-    
-    price_df = pd.DataFrame(price_history)
-    
-    # Price trend chart
-    selected_product = st.selectbox("Select Product", products)
-    product_prices = price_df[price_df['product'] == selected_product]
-    
-    fig = px.line(
-        product_prices,
-        x='date',
-        y='price',
-        title=f"{selected_product} Price Trends"
-    )
-    st.plotly_chart(fig)
-    
-    # Market insights
-    st.subheader("Market Insights")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.write("**Price Comparison**")
-        current_prices = st.session_state.products.copy()
-        current_prices['price_category'] = pd.qcut(
-            current_prices['price_per_unit'],
-            q=3,
-            labels=['Low', 'Medium', 'High']
-        )
-        st.dataframe(current_prices[['name', 'price_per_unit', 'unit', 'price_category']])
-    
-    with col2:
-        st.write("**Seasonal Analysis**")
-        season_counts = pd.Series(
-            [season for seasons in st.session_state.products['season']
-             for season in seasons.split('/')]
-        ).value_counts()
-        
-        fig = px.bar(
-            x=season_counts.index,
-            y=season_counts.values,
-            title="Products Available by Season"
-        )
-        st.plotly_chart(fig)
 
 # Footer
 st.markdown("---")
